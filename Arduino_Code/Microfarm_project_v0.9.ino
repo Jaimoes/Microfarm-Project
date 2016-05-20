@@ -22,6 +22,14 @@
   A1 = Soil humidity
 */
 
+/* Plant types 
+	0 = 
+	1 =
+	
+
+ */
+#define PlantType 1
+
 /* Ethernet */
 #include <Ethernet.h>
 #include <SPI.h>
@@ -89,6 +97,9 @@ int currentPlantAge = 0;
 boolean plantAgeReset = false;
 boolean plantAgeSet = false;
 
+
+
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Mircofarm software");
@@ -120,6 +131,9 @@ void setup() {
   setSyncProvider(getNtpTime);
   /* PlantAge */
   checkPlantAgeInit();
+
+  
+  
   
   Serial.println("Setup done!");
 }
@@ -134,7 +148,7 @@ void loop() {
 		updatePlantAge();
 		errorHandling();
 		fanControl(true, 1);
-		plantLightControl();
+		plantLightControl(PlantType);
 		microfarmWebInterface();
 
 		if (currentMillis - previousMillis > interval) {
@@ -362,31 +376,114 @@ void microfarmWebInterface(){
     }
   }
 }
-void plantLightControl(){
+int plantAgeToWeeks(){
+	return currentPlantAge / 7;
+}
+void plantLightControl(int plantID){
 	
-	if(currentPlantAge < 15 ){
-		lightControl(24);
-	} 
-	else if(currentPlantAge >= 15 && currentPlantAge < 30 ){
-		lightControl(16);
+	switch(plantID){
+		case 0:
+		switch(plantAgeToWeeks()){
+			case 0:
+			lightControl(24);
+			break;
+			case 1:
+			lightControl(24);
+			break;
+			case 2:
+			lightControl(24);
+			break;
+			case 3:
+			lightControl(18);
+			break;
+			case 4:
+			lightControl(18);
+			break;
+			case 5:
+			lightControl(18);
+			break;
+			case 6:
+			lightControl(18);
+			break;
+			case 7:
+			lightControl(16);
+			break;
+			case 8:
+			lightControl(16);
+			break;
+		}		
+		break;
+		case 1:
+		switch(plantAgeToWeeks()){
+			case 0:
+			lightControl(24);
+			break;
+			case 1:
+			lightControl(24);
+			break;
+			case 2:
+			lightControl(24);
+			break;
+			case 3:
+			lightControl(18);
+			break;
+			case 4:
+			lightControl(18);
+			break;
+			case 5:
+			lightControl(18);
+			break;
+			case 6:
+			lightControl(18);
+			break;
+			case 7:
+			lightControl(16);
+			break;
+			case 8:
+			lightControl(16);
+			break;
+		}		
+		break;
+		default:
+		switch(plantAgeToWeeks()){
+			case 0:
+			lightControl(24);
+			break;
+			case 1:
+			lightControl(24);
+			break;
+			case 2:
+			lightControl(24);
+			break;
+			case 3:
+			lightControl(18);
+			break;
+			case 4:
+			lightControl(18);
+			break;
+			case 5:
+			lightControl(18);
+			break;
+			case 6:
+			lightControl(18);
+			break;
+			case 7:
+			lightControl(16);
+			break;
+			case 8:
+			lightControl(16);
+			break;
+		}
+		break;
+		
 	}
-	else if(currentPlantAge >= 30 && currentPlantAge < 45 ){
-		lightControl(18);
-	}
-	else if(currentPlantAge >= 45 && currentPlantAge < 70 ){
-		lightControl(20);
-	}
-	else if(currentPlantAge > 70){
-		lightControl(12);
-	}
-	
 }
 void updatePlantAge(){
 	static int paMonth = getMonthPlantAgeWasSet();
 	static int paDay = getDayPlantAgeWasSet();
 	static int paOriginal = getPlantAge();
 	
-	int monthValues[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	
 	
 	//Check if EEPROM version of plantAge has been reset since init.
 	if(plantAgeReset){
@@ -407,7 +504,7 @@ void updatePlantAge(){
 		}
 	}
 	if(month() != paMonth){
-		
+		int monthValues[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 		int monDifference = month() - paMonth;
 		int paMonthInDays;
 		if(monDifference >= 1){
@@ -554,18 +651,6 @@ void errorHandling() {
   } else if (error == 1) {
     digitalWrite(ledBAD, HIGH);
     analogWrite(ledOK, 255);
-  }
-}
-void climateControl(DHT dhtInside, DHT dhtOutside) {
-
-  if ( getTemp(dhtInside) < minTemp ) {
-    // put heater on
-  }
-  if ( getTemp(dhtInside) > maxTemp && getTemp(dhtOutside) < maxTemp ) {
-    // fan on
-  }
-  if ( getTemp(dhtInside) < minTemp  && getTemp(dhtOutside) > minTemp ) {
-
   }
 }
 void pumpControl() { // turn pump on if soil hum is low
