@@ -1,0 +1,77 @@
+<html>
+  <head>
+  <title>Microfarm data shown realtime</title>
+      <!--Load the AJAX API-->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawChart);
+	  
+      function drawChart() {
+		
+		var width = $(window).width()
+		
+		if( width < 500){
+			var width = 500;
+		}
+		
+        var options = {
+          title: 'Temperatures in microfarm0',
+          //curveType: 'function',
+		  'width': width,
+          'height':300,
+		  series: {
+            0: { color: '#e2431e' },
+            1: { color: '#e7711b' },
+            2: { color: '#f1ca3a' },
+		  },
+          legend: { position: 'top' }
+        };
+		var options2 = {
+          title: 'Humidity in microfarm0',
+          //curveType: 'function',
+		  'width':width,
+          'height':300,
+		  series: {
+            0: { color: '#6f9654' },
+            1: { color: '#1c91c0' },
+            2: { color: '#43459d' },
+		  },
+          legend: { position: 'top' }
+        };
+		
+		var tChart = new google.visualization.LineChart(document.getElementById('temp_chart'));
+		var hChart = new google.visualization.LineChart(document.getElementById('hum_chart'));
+		
+		function updateChart() {
+			var jsonTempData = $.ajax({
+				url: "getTempData_REALTIME.php",
+				dataType: "json",
+				async: false
+			}).responseText;
+		
+			var jsonHumData = $.ajax({
+				url: "getHumData_REALTIME.php",
+				dataType: "json",
+				async: false
+			}).responseText;
+			
+			var tData = new google.visualization.DataTable(jsonTempData);	
+			var hData = new google.visualization.DataTable(jsonHumData);	
+		
+			tChart.draw(tData, options);
+			hChart.draw(hData, options2);
+	 
+	    }
+		updateChart();
+		setInterval(updateChart, 8000);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="temp_chart"></div>
+	<div id="hum_chart"></div>
+  </body>
+</html>

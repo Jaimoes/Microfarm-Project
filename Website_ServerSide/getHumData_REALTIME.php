@@ -3,7 +3,7 @@
 include("connect.php"); 	
 	
 $link=Connection();
-$result = mysqli_query($link, "SELECT time, humOutside, humInside, humSoil FROM `Microfarm0Climate` ORDER BY `time` ASC");    
+$result = mysqli_query($link, "select time, humOutside, humInside, humSoil from ( select time, humOutside, humInside, humSoil from microfarm0climate order by time desc limit 50 ) sub order by time asc");    
  
     $table = array();
     $table['cols'] = array(

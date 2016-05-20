@@ -1,9 +1,8 @@
 /* TODO:
     Add functions to control when to put on lights/fan
 	  Edit Error handling function > LED green / yellow PULSE
-    Add way to store data when offline > SD
     Check getNTP function > No connection = offline modus enabled after x tries > retry every x 
-    Lightcontrol should know plant age and behave accordingly
+    Lightcontrol should have input for plant > how long time should be on off per plant
 */
 
 /* Pins used:
@@ -31,8 +30,9 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 //byte localServer[] = { 192, 168, 1, 74 };
 char dataServer[] = "greensworth.nl";
 EthernetClient client;
-IPAddress ip(192, 168, 1, 55);
+IPAddress ip(192, 168, 1, 25);
 bool connectedWithEthernet;
+EthernetServer server(80);
 /* DHT    */
 #include <DHT.h>
 #define DHTTYPE DHT11   // DHT 11
@@ -72,7 +72,7 @@ int minSoilHum = 450; // Add correct variable !!!!
 int SoilHum = 0;
 /* Multithread vars */
 long previousMillis = 0;
-long interval = 5000; // 300000 = 5minutes
+long interval = 10000; // 300000 = 5minutes
 /* Temperature control  */
 int minTemp = 22;
 int maxTemp = 27;
@@ -82,14 +82,17 @@ int ledOK = 44;
 int ledBAD = 23;
 /* Fan Control variables */
 int fanControlPin = 45;
-/* SD */
-#include <SD.h>
-File logfile;
+/* Plant Age */
+#include <EEPROM.h>
+String readString, newString;
+int currentPlantAge = 0;
+boolean plantAgeReset = false;
+boolean plantAgeSet = false;
 
 void setup() {
   Serial.begin(9600);
   Serial.println("Mircofarm software");
-  Serial.println("Version v0.8");
+  Serial.println("Version v0.9");
   Serial.println("Setting up");
   Serial.println(".............................................");
   Serial.println();
@@ -103,6 +106,7 @@ void setup() {
   /* Ethernet */
   Serial.println("Starting ethernet, please wait...");
   startEthernet();
+  server.begin();
   /* DS18B20 */
   Serial.println("Starting DS18B20 sensor, please wait...");
   sensors.begin();
@@ -114,7 +118,9 @@ void setup() {
   Serial.println("Setting up time()...");
   Udp.begin(localPort);
   setSyncProvider(getNtpTime);
-
+  /* PlantAge */
+  checkPlantAgeInit();
+  
   Serial.println("Setup done!");
 }
 
@@ -122,56 +128,79 @@ void loop() {
   unsigned long currentMillis = millis();
   if (timeStatus() != timeNotSet) {
     time_t t = now();
-    
-    errorHandling();
+	if(plantAgeSet){
+		
+		/* Control functions */
+		updatePlantAge();
+		errorHandling();
+		fanControl(true, 1);
+		plantLightControl();
+		microfarmWebInterface();
 
-    fanControl(true, 1);
-    lightControl(20);
-    
-  
-
-    if (currentMillis - previousMillis > interval) {
-      soilHumControl();
+		if (currentMillis - previousMillis > interval) {
+			soilHumControl();
       
-      if ( hour() > 9 || hour() < 22 ){
-        pumpControl();
-      }
-      //serverControl();
+			if ( hour() > 9 || hour() < 22 ){
+				pumpControl();
+			}
+			//serverControl();
       
 
-      previousMillis = currentMillis;
-//      Serial.print("Farm temperature is: ");
-//      Serial.println(getTemp(dhtInside));
-//      Serial.print("Farm humidity is: ");
-//      Serial.println(getHumd(dhtInside));
-//      Serial.print("Farm index is: ");
-//      Serial.println(getIndx(dhtInside));
-//      Serial.print("Growbed temperature is: ");
-//      Serial.println(getGroundTemp(tempDeviceAddress));
-//      Serial.println("");
-//      Serial.print("Outside temperature is: ");
-//      Serial.println(getTemp(dhtOutside));
-//      Serial.print("Outside humidity is: ");
-//      Serial.println(getHumd(dhtOutside));
-//      Serial.print("Outside index is: ");
+			previousMillis = currentMillis;
+//   		Serial.print("Farm temperature is: ");
+//     	Serial.println(getTemp(dhtInside));
+//     	Serial.print("Farm humidity is: ");
+//     	Serial.println(getHumd(dhtInside));
+//     	Serial.print("Farm index is: ");
+//     	Serial.println(getIndx(dhtInside));
+//     	Serial.print("Growbed temperature is: ");
+//     	Serial.println(getGroundTemp(tempDeviceAddress));
+//     	Serial.println("");
+//     	Serial.print("Outside temperature is: ");
+//     	Serial.println(getTemp(dhtOutside));
+//    	Serial.print("Outside humidity is: ");
+//     	Serial.println(getHumd(dhtOutside));
+//     	Serial.print("Outside index is: ");
 //      Serial.println(getIndx(dhtOutside));
 //      Serial.println("");
-      Serial.print("Soil humidity is: ");
-      Serial.print(getSoilHum());
-      Serial.println("%");
-      Serial.print("Soil humidity average is: ");
-      Serial.print(SoilHum);
-      Serial.println("%");
-      Serial.println("");
-      Serial.print("Time: ");
-      Serial.print(hour());
-      Serial.print(":");
-      Serial.println(minute());
-      Serial.println("");
-      Serial.print("Day: ");
-      Serial.println(day());
+//			Serial.print("Soil humidity is: ");
+//			Serial.print(getSoilHum());
+//			Serial.println("%");
+//			Serial.print("Soil humidity average is: ");
+//			Serial.print(SoilHum);
+//			Serial.println("%");
+//			Serial.println("");
+//			Serial.print("Time: ");
+//			Serial.print(hour());
+//			Serial.print(":");
+//			Serial.println(minute());
+//			Serial.println("");
+//			Serial.print("Current day: ");
+//			Serial.println(day());
+			Serial.print("Plant age is currently ");
+			Serial.println(currentPlantAge);
+//			Serial.print("Plant age was set on date: ");
+//			Serial.print(getDayPlantAgeWasSet());
+//			Serial.print("/");
+//			Serial.println(getMonthPlantAgeWasSet());
+			sendClimateData2Server(getTemp(dhtOutside),getHumd(dhtOutside),getTemp(dhtInside), getHumd(dhtInside),getGroundTemp(tempDeviceAddress), getSoilHum());
 	  
-    }
+		}
+	} else {
+    Serial.println("Plant age was not set, please use the web interface to set plant age");
+    Serial.print("Web interface can be found on: ");
+    Serial.println(Ethernet.localIP());
+		microfarmWebInterface();
+		error = 1;
+		errorHandling();
+		if(plantAgeReset){
+			plantAgeSet = true;
+			error = 0;
+		}
+	}
+    
+	
+    
   } else {
 	  
 	  Serial.println("Time was not set correctly or could not be retrieved.");
@@ -180,6 +209,230 @@ void loop() {
 	  errorHandling();
 	  delay(10000);
   } // ELSE RESET TIME!!!
+}
+void sendPlantAgeToServer(int plantAge){
+	
+	Serial.print("Connecting to server....");
+	if (client.connect(dataServer, 80)) { 
+		Serial.println("connected!");
+		client.print("GET /addPlantAge.php?plantAge=");
+		client.print(plantAge);
+		client.println(" HTTP/1.1");
+		client.print("Host: ");
+		client.println(dataServer);
+//    	client.println("192.168.1.74");
+		client.println("Connection: close");
+		client.println();
+		delay(100);
+		client.stop();
+		Serial.println("Update send to server!"); 
+	} else {
+		Serial.println("pumpOn encountered an error!");
+	}
+}
+void checkPlantAgeInit(){
+	if(getDayPlantAgeWasSet() != 0 && getDayPlantAgeWasSet() != 255){
+		if(getMonthPlantAgeWasSet() != 0 && getMonthPlantAgeWasSet() != 255){
+			if(getPlantAge() != 0 && getPlantAge() != 255){
+				plantAgeSet = true;
+				currentPlantAge = getPlantAge(); 
+				Serial.println("Plant age is set!");	
+			}
+		}
+	} else {
+		Serial.print("Plant age isn't set!");
+	}
+}
+void writeMonthToEEPROM(int month){
+	EEPROM.update(2, byte(month));
+	Serial.print("Writing ");
+	Serial.print(byte(month));
+	Serial.println(" to EEPROM");
+}
+int getMonthPlantAgeWasSet(){
+	byte i;
+	EEPROM.get(2, i);
+	return int(i);
+}
+void writeDayToEEPROM(int day){
+	EEPROM.update(1, byte(day));
+	Serial.print("Writing ");
+	Serial.print(byte(day));
+	Serial.println(" to EEPROM");
+}
+int getDayPlantAgeWasSet(){
+	byte i;
+	EEPROM.get(1, i);
+	return int(i);
+}
+void writePlantAgeToEEPROM(int plantAge) {	
+	EEPROM.update(0, byte(plantAge));
+	Serial.print("Writing ");
+	Serial.print(byte(plantAge));
+	Serial.println(" to EEPROM");
+	plantAgeReset = true;
+}
+int getPlantAge(){
+	byte i;
+	EEPROM.get(0, i);
+	return int(i);
+}
+void updatePlantAgeOnEEPROM(int plantAge){
+	EEPROM.update(0, byte(plantAge));
+	plantAgeReset = true;
+}
+void microfarmWebInterface(){
+	EthernetClient client = server.available();
+  if (client) {
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+
+        //read char by char HTTP request
+        if (readString.length() < 100) {
+
+          //store characters to string 
+          readString += c; 
+          //Serial.print(c);
+        } 
+
+        //if HTTP request has ended
+        if (c == '\n') {
+
+          ///////////////
+          Serial.print(readString); //see what was captured
+
+          //now output HTML data header
+
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println();
+
+          client.println("<HTML>");
+          client.println("<HEAD>");
+          client.println("<TITLE>Microfarm internal settings page</TITLE>");
+          client.println("</HEAD>");
+          client.println("<BODY>");
+
+          client.println("<H1>Microfarm internal settings</H1>");
+
+          client.println("<FORM ACTION='/' method=get >"); //uses IP/port of web page
+
+          client.println("Set plant age in days: <INPUT TYPE=TEXT NAME='PLANT' VALUE='' SIZE='25' MAXLENGTH='25'><BR>");
+
+          client.println("<INPUT TYPE=SUBMIT NAME='submit' VALUE='Submit plant age'>");
+
+          client.println("</FORM>");
+
+          client.println("<BR>");
+
+          client.println("</BODY>");
+          client.println("</HTML>");
+
+          delay(1);
+          //stopping client
+          client.stop();
+
+          /////////////////////
+          if (readString.length() >0) {
+            //Serial.println(readString); //prints string to serial port out
+            int pos1 = readString.indexOf('=');
+            int pos2 = readString.indexOf('&');
+            newString = readString.substring(pos1+1, pos2);
+            //Serial.print("newString is: ");
+            //Serial.println(newString);
+            int n = newString.toInt();
+			
+			if(n != 0){
+				writePlantAgeToEEPROM(n);
+			    writeDayToEEPROM(day());
+			    writeMonthToEEPROM(month());
+				sendPlantAgeToServer(n);
+			}
+			      
+            Serial.print("The value sent is: ");
+            Serial.println(n);
+            readString=""; //clears variable for new input    
+            newString=""; //clears variable for new input
+            // auto select appropriate value
+            
+          }           
+        }
+      }
+    }
+  }
+}
+void plantLightControl(){
+	
+	if(currentPlantAge < 15 ){
+		lightControl(24);
+	} 
+	else if(currentPlantAge >= 15 && currentPlantAge < 30 ){
+		lightControl(16);
+	}
+	else if(currentPlantAge >= 30 && currentPlantAge < 45 ){
+		lightControl(18);
+	}
+	else if(currentPlantAge >= 45 && currentPlantAge < 70 ){
+		lightControl(20);
+	}
+	else if(currentPlantAge > 70){
+		lightControl(12);
+	}
+	
+}
+void updatePlantAge(){
+	static int paMonth = getMonthPlantAgeWasSet();
+	static int paDay = getDayPlantAgeWasSet();
+	static int paOriginal = getPlantAge();
+	
+	int monthValues[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	
+	//Check if EEPROM version of plantAge has been reset since init.
+	if(plantAgeReset){
+		currentPlantAge = getPlantAge();
+		plantAgeReset = false;
+	}
+	//Check if day changed since plantAge was set > if so update.
+	if(month() == paMonth){
+		if(day() > paDay){
+			int dayDifference = day() - paDay;
+			int paDifference = currentPlantAge - paOriginal;
+			if(dayDifference > paDifference){
+        Serial.println("Updating plant age...");
+				currentPlantAge += (dayDifference - paDifference);
+				//updatePlantAgeOnEEPROM(currentPlantAge);
+			}
+			  
+		}
+	}
+	if(month() != paMonth){
+		
+		int monDifference = month() - paMonth;
+		int paMonthInDays;
+		if(monDifference >= 1){
+			for(int i = paMonth; i < (month()); i++){
+				paMonthInDays += monthValues[(i - 1)];
+			}
+			paMonthInDays -= paDay;
+			paMonthInDays += day();
+		} else if(monDifference < 0){
+			for(int i = paMonth; i < 12 + 1; i++){
+				paMonthInDays += monthValues[(i - 1)];
+			}
+			for(int i = 1; i < month() + 1; i++){
+				paMonthInDays += monthValues[i];
+			}
+			paMonthInDays -= paDay;
+			paMonthInDays += day();
+		}
+		if(currentPlantAge != paMonthInDays){
+			currentPlantAge = paMonthInDays;
+			Serial.print("currentPlantAge = ");
+			Serial.println(currentPlantAge);      
+		}
+		paMonthInDays = 0;
+	}
 }
 void lightControl(int hoursDay){
 	
@@ -208,15 +461,13 @@ void lightControl(int hoursDay){
 			}
 		break;
 		case 1:
-     if ( hour() >= timeOff && hour() < startTime ){
+			if ( hour() >= timeOff && hour() < startTime ){
        lightsOn(false);
       } else {
         lightsOn(true);
       }
 		break;
 	}
-}
-void ethernetControl(){
 	
 }
 void pumpOn2Server(){
@@ -241,7 +492,7 @@ void pumpOn2Server(){
 void serverControl(){
 	static boolean doOnce;
   
-	if(minute() == 30 || minute() == 4){
+	if(minute() == 30 || minute() == 0){
     if(!doOnce){
       sendClimateData2Server(getTemp(dhtOutside),getHumd(dhtOutside),getTemp(dhtInside), getHumd(dhtInside),getGroundTemp(tempDeviceAddress), getSoilHum());
       doOnce = true;
@@ -300,8 +551,7 @@ void errorHandling() {
     delay(30);
     analogWrite(ledOK, pulseVar);
     digitalWrite(ledBAD, LOW);
-  }
-  if (error == 1) {
+  } else if (error == 1) {
     digitalWrite(ledBAD, HIGH);
     analogWrite(ledOK, 255);
   }
@@ -621,3 +871,4 @@ time_t getNtpTime() {
 
 
 
+v

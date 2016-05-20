@@ -3,7 +3,7 @@
    	
    	$link=Connection();
 
-	//if($_SERVER['REMOTE_ADDR'] == "87.209.22.67") { // Use with online Server
+	if($_SERVER['REMOTE_ADDR'] == "87.214.245.168") { // Use with online Server
 		
 		
 		$tO=(isset($_GET["tO"]) ? $_GET["tO"] : null);
@@ -28,5 +28,5 @@
 		//echo $query;
 		mysqli_query($link, $query);
 		mysqli_close($link);
-	//}
+	}
 ?>

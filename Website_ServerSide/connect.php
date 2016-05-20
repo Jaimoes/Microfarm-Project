@@ -3,7 +3,7 @@
 	function Connection(){
 		$server="localhost";
 		$user="root";
-		$pass="";
+		$pass="p0kemon!";
 		$db="microfarm1";
 	   	
 		$connection = mysqli_connect($server, $user, $pass);
