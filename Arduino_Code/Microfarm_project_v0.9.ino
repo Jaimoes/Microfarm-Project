@@ -1,8 +1,7 @@
 /* TODO:
-    Add functions to control when to put on lights/fan
-	  Edit Error handling function > LED green / yellow PULSE
-    Check getNTP function > No connection = offline modus enabled after x tries > retry every x 
-    Lightcontrol should have input for plant > how long time should be on off per plant
+	Edit Error handling function > LED green / yellow PULSE
+    Use IR to measure plant growth
+	What to do if disconnected? > Error > stop sending data > check every x if connection available ( connection control? )
 */
 
 /* Pins used:
@@ -23,18 +22,16 @@
 */
 
 /* Plant types 
-	0 = 
-	1 =
+	0 = Sin Tra Bajo
+	1 = BeetRoot
 	
 
  */
 #define PlantType 1
-
 /* Ethernet */
 #include <Ethernet.h>
 #include <SPI.h>
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-//IPAddress localServer = (192,168,1,74 ); // Server IP UNUSED
 //byte localServer[] = { 192, 168, 1, 74 };
 char dataServer[] = "greensworth.nl";
 EthernetClient client;
@@ -73,7 +70,7 @@ unsigned int localPort = 8888; // local port to listen for UDP packets
 const int timeZone = 2;     // Central European Time
 IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
 /* Pump Variables */
-int pumpOnFor = 5;
+int pumpOnFor = 5; // <- seconds
 /* Soil Humidity variables */
 int soilHumPin = A1;  // Analog Pin
 int minSoilHum = 450; // Add correct variable !!!!
@@ -131,13 +128,8 @@ void setup() {
   setSyncProvider(getNtpTime);
   /* PlantAge */
   checkPlantAgeInit();
-
-  
-  
-  
   Serial.println("Setup done!");
 }
-
 void loop() {
   unsigned long currentMillis = millis();
   if (timeStatus() != timeNotSet) {
@@ -191,8 +183,8 @@ void loop() {
 //			Serial.println("");
 //			Serial.print("Current day: ");
 //			Serial.println(day());
-			Serial.print("Plant age is currently ");
-			Serial.println(currentPlantAge);
+//			Serial.print("Plant age is currently ");
+//			Serial.println(currentPlantAge);
 //			Serial.print("Plant age was set on date: ");
 //			Serial.print(getDayPlantAgeWasSet());
 //			Serial.print("/");
@@ -225,7 +217,6 @@ void loop() {
   } // ELSE RESET TIME!!!
 }
 void sendPlantAgeToServer(int plantAge){
-	
 	Serial.print("Connecting to server....");
 	if (client.connect(dataServer, 80)) { 
 		Serial.println("connected!");
@@ -380,10 +371,10 @@ int plantAgeToWeeks(){
 	return currentPlantAge / 7;
 }
 void plantLightControl(int plantID){
-	
 	switch(plantID){
 		case 0:
 		switch(plantAgeToWeeks()){
+			// month 1
 			case 0:
 			lightControl(24);
 			break;
@@ -399,6 +390,7 @@ void plantLightControl(int plantID){
 			case 4:
 			lightControl(18);
 			break;
+			// month 2
 			case 5:
 			lightControl(18);
 			break;
@@ -948,9 +940,6 @@ time_t getNtpTime() {
     }
   }
   Serial.println("No NTP Response :-(");
-  if(renewEthernet() == 1 || renewEthernet() == 3) {
-    startEthernet();
-  }
   return 0; // return 0 if unable to get the time
 }
 
