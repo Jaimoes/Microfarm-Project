@@ -10,6 +10,7 @@
 	$result = mysqli_query($link, "SELECT time FROM `Microfarm0irrigationt` ORDER BY `time` DESC LIMIT 1");
 	$pumpLastOn = mysqli_fetch_assoc($result);
 	mysqli_free_result($result);
+	
 	mysqli_close($link);
 	
 	$date1 = new DateTime($plantAge['time']);
@@ -17,7 +18,6 @@
 	$date2 = new DateTime(date("Y-m-d H:i:s",$t));
 
 	$interval = $date1->diff($date2);
-
 ?>
 
 <html>
