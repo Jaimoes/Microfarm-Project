@@ -1,0 +1,13 @@
+
+INSERT INTO Microfarm0PlantAge VALUES ( NOW(), 14);
+
+INSERT INTO Microfarm0IrrigationT VALUES ( NOW(), 1);
+
+INSERT INTO microfarm0Climate (`time`,`tempOutside`, `humOutside`, `tempInside`, `humInside`, `tempSoil`, `humSoil`) 
+	VALUES (NOW(), 22.00, 67.00, 24.00, 88.00, 26.00, 54.00); 
+
+SELECT table_schema "Data Base Name",
+    sum( data_length + index_length ) / 1024 / 1024 "Data Base Size in MB",
+    sum( data_free )/ 1024 / 1024 "Free Space in MB"
+FROM information_schema.TABLES
+GROUP BY table_schema ; 

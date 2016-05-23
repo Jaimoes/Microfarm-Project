@@ -1,0 +1,2 @@
+CREATE TABLE Microfarm0PlantSize ( time TIMESTAMP NOT NULL PRIMARY KEY,
+				plantSize INT(4) NOT NULL );
